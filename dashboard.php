@@ -1,309 +1,277 @@
 <?php
 include 'config.php';
-
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
-
 $user_id = $_SESSION['user_id'];
-$res = mysqli_query($conn, "SELECT * FROM users WHERE id = '$user_id'");
-$user = mysqli_fetch_assoc($res);
-
-$count_res = mysqli_query($conn, "SELECT COUNT(*) AS total FROM items WHERE user_id = '$user_id' AND status = 'available'");
-$count_row = mysqli_fetch_assoc($count_res);
-$total_items = $count_row['total'];
-
-$offer_count_res = mysqli_query($conn, "SELECT COUNT(DISTINCT c.id) AS total 
-                                          FROM comments c
-                                          INNER JOIN items i ON c.item_id = i.id
-                                          WHERE i.user_id = '$user_id' AND i.status = 'available' AND c.is_reply = 0");
-$offer_count_row = mysqli_fetch_assoc($offer_count_res);
-$total_offers = $offer_count_row['total'];
-
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['send_reply'])) {
-    $item_id = intval($_POST['item_id']);
-    $parent_id = intval($_POST['parent_id']);
-    $reply_msg = trim($_POST['reply_message']);
-    
-    if (!empty($reply_msg)) {
-        $reply_msg = mysqli_real_escape_string($conn, $reply_msg);
-        $sql = "INSERT INTO comments (item_id, user_id, message, parent_id, is_reply) 
-                VALUES ('$item_id', '$user_id', '$reply_msg', '$parent_id', 1)";
-        mysqli_query($conn, $sql);
-        
-        mysqli_query($conn, "UPDATE items SET status = 'traded' WHERE id = '$item_id'");
-    }
-    header("Location: dashboard.php");
-    exit;
-}
+$fullname = $_SESSION['fullname'];
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Dashboard — Barter System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barter System — Dashboard</title>
     <style>
-        body { background-color: #f8f9fa; }
-        .text-theme { color: #198754; }
-        .btn-success { background-color: #198754; border-color: #198754; }
-        .btn-success:hover { background-color: #157347; border-color: #146c43; }
-        .stat-card {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background-color: #fff;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .stat-card:hover {
-            border-color: #198754;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+
+        body {
+    min-height: 100vh;
+    background: #f0fdf4;
+    display: flex;
+    margin-left: 240px;
+
         }
-        .stat-card-header {
+
+        .sidebar {
+            width: 240px;
+            background: #ffffff;
+            border-right: 2px solid #22c55e;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: fixed;
+            height: 100vh;
+        }
+
+        .sidebar-logo {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 40px;
         }
-        .stat-card-icon { font-size: 28px; color: #198754; }
-        .stat-card-number { font-size: 28px; font-weight: 700; color: #198754; }
-        .card-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.4s ease;
+
+        .sidebar-logo img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            margin-right: 8px;
         }
-        .card-content.open {
-            max-height: 3000px;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
+
+        .sidebar-logo span {
+            color: #22c55e;
         }
-        .offer-item {
-            background-color: #f8f9fa;
-            border-left: 3px solid #198754;
-            padding: 15px;
+
+        .nav-links {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            color: #374151;
+            text-decoration: none;
+            font-size: 15px;
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+
+        .nav-link.active {
+            background: #dcfce7;
+            border: 1px solid #22c55e;
+            color: #16a34a;
+            font-weight: 500;
+        }
+
+        .sidebar-bottom {
+            padding-top: 30px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 12px;
-            border-radius: 0 6px 6px 0;
         }
-        .reply-item {
-            background-color: #e8f5e9;
-            border-left: 3px solid #0d6efd;
-            padding: 12px;
-            margin: 10px 0 5px 20px;
-            border-radius: 0 6px 6px 0;
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: #22c55e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
         }
-        .reply-form {
-            margin: 10px 0 10px 20px;
-            display: none;
+
+        .user-details .name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1f2937;
         }
-        .reply-form.show { display: block; }
-        .toggle-icon { transition: transform 0.3s ease; }
-        .toggle-icon.rotated { transform: rotate(180deg); }
-        .text-muted-small { font-size: 13px; color: #6c757d; }
+
+        .user-details .status {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .logout-btn {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            background: transparent;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 240px;
+            padding: 30px 40px;
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            color: #111827;
+            margin-bottom: 6px;
+        }
+
+        .page-header p {
+            font-size: 15px;
+            color: #6b7280;
+        }
+
+        .welcome-card {
+            background: #ffffff;
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            padding: 40px 30px;
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .welcome-card h2 {
+            font-size: 24px;
+            color: #111827;
+            margin-bottom: 12px;
+        }
+
+        .welcome-card h2 span {
+            color: #22c55e;
+        }
+
+        .welcome-card p {
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .button-grid.row-2 {
+            grid-template-columns: repeat(1, 200px);
+            justify-content: center;
+        }
+
+        .welcome-btn {
+            padding: 14px 20px;
+            border: 2px solid #22c55e;
+            background: transparent;
+            color: #22c55e;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .welcome-btn:hover {
+            background: #22c55e;
+            color: white;
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-dark bg-success mb-4">
-        <div class="container">
-            <a href="dashboard.php" class="navbar-brand">📦 Barter System</a>
-            <div>
-                <a href="profile.php" class="btn btn-light btn-sm me-2">👤 Profile</a>
-                <a href="trades_history.php" class="btn btn-light btn-sm me-2">📜 History</a>
-                <span class="navbar-text me-2">Hello, <strong><?= htmlspecialchars($user['fullname']) ?></strong></span>
-                <a href="logout.php" class="btn btn-light btn-sm">Logout</a>
-            </div>
-        </div>
-    </nav>
+    <?php include 'sidebar.php'; ?>
 
-    <div class="container">
-        <h3 class="text-theme mb-4">Your Dashboard</h3>
+            <div class="sidebar-logo">
+                <img src="logo.jpg" alt="Logo">
+                Barter<span>System</span>
+            </div>
 
-        <!-- ITEMS POSTED -->
-        <div class="stat-card" id="itemsCard" onclick="toggleCard('itemsContent', 'itemsIcon')">
-            <div class="stat-card-header">
-                <div class="d-flex align-items-center">
-                    <span class="stat-card-icon me-3">📋</span>
-                    <div>
-                        <h5 class="mb-1">Items Posted</h5>
-                        <span class="stat-card-number"><?= $total_items ?></span>
-                        <span class="text-muted-small ms-1">Available only</span>
-                    </div>
-                </div>
-                <span class="toggle-icon" id="itemsIcon">▼</span>
-            </div>
-            <div class="card-content" id="itemsContent">
-                <?php
-                $my_items = mysqli_query($conn, "SELECT * FROM items WHERE user_id = '$user_id' ORDER BY posted_at DESC");
-                if (mysqli_num_rows($my_items) > 0):
-                ?>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-success">
-                                <tr>
-                                    <th>Item Name</th>
-                                    <th>Category</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php while ($item = mysqli_fetch_assoc($my_items)): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($item['item_name']) ?></td>
-                                    <td><?= htmlspecialchars($item['category']) ?></td>
-                                    <td>
-                                        <?php if ($item['status'] == 'available'): ?>
-                                            <span class="badge bg-success">Available</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-secondary">Traded / Replied</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if ($item['status'] == 'available'): ?>
-                                            <a href="edit_item.php?id=<?= $item['id'] ?>" class="btn btn-primary btn-sm">Edit</a>
-                                        <?php else: ?>
-                                            <span class="text-muted-small">No longer editable</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                                <?php endwhile; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <p class="text-muted mb-0">You haven't posted any items yet.</p>
-                    <a href="post_item.php" class="btn btn-success btn-sm mt-2">Post Your First Item</a>
-                <?php endif; ?>
-            </div>
+            <nav class="nav-links">
+                <a href="dashboard.php" class="nav-link active">
+                    <span>🏠</span> Dashboard
+                </a>
+                <a href="index.php" class="nav-link">
+                    <span>📦</span> Browse Items
+                </a>
+                <a href="post_item.php" class="nav-link">
+                    <span>+</span> Post Item
+                </a>
+                <a href="tradehistory.php" class="nav-link">
+                    <span>📋</span> Trade History
+                </a>
+                <a href="profile.php" class="nav-link">
+                    <span>👤</span> My Profile
+                </a>
+            </nav>
         </div>
 
-        <!-- OFFERS RECEIVED -->
-        <div class="stat-card" id="offersCard" onclick="toggleCard('offersContent', 'offersIcon')">
-            <div class="stat-card-header">
-                <div class="d-flex align-items-center">
-                    <span class="stat-card-icon me-3">💬</span>
-                    <div>
-                        <h5 class="mb-1">Offers Received</h5>
-                        <span class="stat-card-number"><?= $total_offers ?></span>
-                        <span class="text-muted-small ms-1">Available items only</span>
-                    </div>
-                </div>
-                <span class="toggle-icon" id="offersIcon">▼</span>
-            </div>
-            <div class="card-content" id="offersContent">
-                <?php
-                $my_items_offers = mysqli_query($conn, "SELECT i.*, c.*, u.fullname AS sender_name 
-                                                          FROM items i
-                                                          LEFT JOIN comments c ON i.id = c.item_id AND c.is_reply = 0
-                                                          LEFT JOIN users u ON c.user_id = u.id
-                                                          WHERE i.user_id = '$user_id' AND i.status = 'available'
-                                                          ORDER BY i.posted_at DESC, c.created_at ASC");
-                
-                if (mysqli_num_rows($my_items_offers) > 0):
-                    $current_item = null;
-                    $has_offers = false;
-                ?>
-                    <div>
-                        <?php while ($row = mysqli_fetch_assoc($my_items_offers)): ?>
-                            <?php if ($row['id'] != $current_item): ?>
-                                <?php if ($current_item !== null): ?></div><?php endif; ?>
-                                <h6 class="text-theme mb-2 mt-3">📦 <?= htmlspecialchars($row['item_name']) ?></h6>
-                                <?php $current_item = $row['id']; ?>
-                            <?php endif; ?>
-                            
-                            <?php if (!empty($row['message'])): ?>
-                                <?php $has_offers = true; ?>
-                                <div class="offer-item">
-                                    <strong class="text-dark"><?= htmlspecialchars($row['sender_name']) ?>:</strong>
-                                    <p class="mb-1 mt-1"><?= htmlspecialchars($row['message']) ?></p>
-                                    <?php if (!empty($row['offered_item'])): ?>
-                                        <span class="badge bg-success">Offered: <?= htmlspecialchars($row['offered_item']) ?></span>
-                                    <?php endif; ?>
-                                    <small class="text-muted d-block mt-1">
-                                        <?= date('M d, Y h:i A', strtotime($row['created_at'])) ?>
-                                    </small>
-                                    
-                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" 
-                                            onclick="document.getElementById('reply-form-<?= $row['id'] ?>').classList.toggle('show')">
-                                        Reply & Mark as Traded
-                                    </button>
-                                    
-                                    <div class="reply-form" id="reply-form-<?= $row['id'] ?>">
-                                        <form method="post">
-                                            <input type="hidden" name="item_id" value="<?= $row['item_id'] ?>">
-                                            <input type="hidden" name="parent_id" value="<?= $row['id'] ?>">
-                                            <div class="mb-2">
-                                                <textarea name="reply_message" class="form-control" rows="2" 
-                                                          placeholder="Write your reply — this will mark the item as traded!" required></textarea>
-                                            </div>
-                                            <button type="submit" name="send_reply" class="btn btn-primary btn-sm">
-                                                Send & Mark as Traded
-                                            </button>
-                                        </form>
-                                        
-                                        <?php
-                                        $reply_res = mysqli_query($conn, "SELECT c.*, u.fullname 
-                                                                          FROM comments c 
-                                                                          JOIN users u ON c.user_id = u.id 
-                                                                          WHERE c.parent_id = {$row['id']} 
-                                                                          ORDER BY c.created_at ASC");
-                                        while ($reply = mysqli_fetch_assoc($reply_res)):
-                                        ?>
-                                            <div class="reply-item">
-                                                <strong class="text-primary"><?= htmlspecialchars($reply['fullname']) ?>:</strong>
-                                                <p class="mb-1 mt-1"><?= htmlspecialchars($reply['message']) ?></p>
-                                                <small class="text-muted">
-                                                    <?= date('M d, Y h:i A', strtotime($reply['created_at'])) ?>
-                                                </small>
-                                            </div>
-                                        <?php endwhile; ?>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
-                        <?php endwhile; ?>
-                    </div>
-                    
-                    <?php if (!$has_offers): ?>
-                        <p class="text-muted mb-0">No offers received yet.</p>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <p class="text-muted mb-0">No offers received yet.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- QUICK ACTIONS -->
-        <h5 class="text-theme mt-4 mb-3">Quick Actions</h5>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <div class="card p-4">
-                    <h5 class="card-title text-theme"> Post New Item</h5>
-                    <p class="card-text">Add an item you want to trade.</p>
-                    <a href="post_item.php" class="btn btn-success">Go to Post</a>
+        <div class="sidebar-bottom">
+            <div class="user-info">
+                <div class="user-avatar"><?php echo strtoupper(substr($fullname, 0, 1)); ?></div>
+                <div class="user-details">
+                    <div class="name"><?php echo htmlspecialchars($fullname); ?></div>
+                    <div class="status">Logged in</div>
                 </div>
             </div>
-            <div class="col-md-6 mb-3">
-                <div class="card p-4">
-                    <h5 class="card-title text-theme"> Browse All Items</h5>
-                    <p class="card-text">See items available for barter from others.</p>
-                    <a href="items.php" class="btn btn-primary">Browse Items</a>
-                </div>
-            </div>
+            <a href="logout.php" class="logout-btn">Log Out</a>
         </div>
     </div>
 
-    <script>
-        function toggleCard(contentId, iconId) {
-            const content = document.getElementById(contentId);
-            const icon = document.getElementById(iconId);
-            content.classList.toggle('open');
-            icon.classList.toggle('rotated');
-        }
-    </script>
+    <div class="main-content">
+        <div class="page-header">
+            <h1>Dashboard</h1>
+            <p>Welcome back, <?php echo htmlspecialchars($fullname); ?>!</p>
+        </div>
+
+        <div class="welcome-card">
+            <h2>Welcome to <span>Barter System</span></h2>
+            <p>Start exchanging items with others in your community</p>
+            
+            <div class="button-grid">
+                <a href="index.php" class="welcome-btn">Browse Items</a>
+                <a href="post_item.php" class="welcome-btn">Post Item</a>
+                <a href="tradehistory.php" class="welcome-btn">Trade History</a>
+            </div>
+            <div class="button-grid row-2">
+                <a href="profile.php" class="welcome-btn">My Profile</a>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
