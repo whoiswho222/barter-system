@@ -27,9 +27,9 @@ import {
 } from "lucide-react";
 import "./App.css";
 
-const API_URL = "https://barter-trading-system.onrender.com/api/auth";
-const ITEM_API_URL = "https://barter-trading-system.onrender.com/api/items";
-const SERVER_URL = "https://barter-trading-system.onrender.com";
+const API_URL = "https://barterhub-backend.onrender.com/api/auth";
+const ITEM_API_URL = "https://barterhub-backend.onrender.com/api/items";
+const SERVER_URL = "https://barterhub-backend.onrender.com";
 
 function App() {
   const [page, setPage] = useState("login");
@@ -248,7 +248,7 @@ const loadProposals = async () => {
 
   try {
     const response = await fetch(
-      "https://barter-trading-system.onrender.com/api/trades/proposals",
+      "https://barterhub-backend.onrender.com/api/trades/proposals",
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -285,7 +285,7 @@ const loadTradeHistory = async () => {
 
   try {
     const response = await fetch(
-      "https://barter-trading-system.onrender.com/api/trades/history",
+      "https://barterhub-backend.onrender.com/api/trades/history",
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -448,7 +448,7 @@ const handleProposalAction = async (proposalId, action) => {
 
   try {
     const response = await fetch(
-      `https://barter-trading-system.onrender.com/api/trades/proposals/${proposalId}/${action}`,
+      `https://barterhub-backend.onrender.com/api/trades/proposals/${proposalId}/${action}`,
       {
         method: "PATCH",
         headers: {
@@ -484,7 +484,7 @@ const handleSendProposal = async (e) => {
 
   try {
     const response = await fetch(
-      "https://barter-trading-system.onrender.com/api/trades/proposals",
+      "https://barterhub-backend.onrender.com/api/trades/proposals",
       {
         method: "POST",
         headers: {
